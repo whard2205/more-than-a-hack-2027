@@ -91,7 +91,13 @@ small). Final ranking is decided by the private full-match score, per the rules.
 - **Ball invisible on 43% of graded frames.** Both levers treat an invisible ball as "hold current
   state", which is right during a genuine loose-ball/crowded scramble but wrong if the ball is
   simply off-screen while play continues normally elsewhere — we have no signal to distinguish the
-  two cases from tracking data alone.
+  two cases from tracking data alone. We tested whether the long (>20s) NOBODY runs that fall
+  *outside* every tagged `SET PIECES` window were missed stoppages worth marking `DEAD` too (Smart
+  Tagging's own documentation admits false negatives). They are not: the three longest ones sit
+  right next to `BALL IN THE BOX` / `PLAYERS IN THE BOX` tags — goalmouth scrambles, i.e. the ball
+  is in its most active moments, just occluded by bunched players. Marking them `DEAD` would have
+  been a confident wrong guess exactly where lever 2's "hold the last possessor" default is the
+  safer one. Left unchanged; recorded here so nobody re-tries this and ships it without checking.
 - **No real player identity.** ATD metadata slots are tracklets ("Track 1".."Track 46"), not
   persistent player IDs, so no model here uses anything about *which* player, only which team.
 - **Smart Tagging is not ground truth** (false positives/negatives acknowledged by its own
