@@ -23,13 +23,20 @@ DEAD frame also resets the challenger count and, this is the one special case, s
     python starter/lever2_sticky.py                    # writes a submission per threshold
     python evaluation/run_evaluation.py --bootstrap 1000
 
-Measured on the public 5-minute window: spellF1 rises smoothly from threshold 5 to a flat plateau
-at 50-65 frames (2.0-2.6 s) -- poss=13, duration=22.2s, fragmentation=0.71, spellF1 0.45-0.47 at
-every point in that plateau -- then falls off past 75. A flat multi-point plateau rather than one
-lucky value is the evidence that this is a real effect of the mechanism, not a fit to 17 possessions
-(the same check EVALUATION.md asks for). It beats tagging_smooth125 (spellF1 0.4485) on this
-window; still below the public window's own noise band, so treat it as the better-evidenced
-candidate, not a confirmed winner -- the private full-match score decides that.
+Back-dating. A flip only clears after `threshold` frames, but the possession it detects began at
+the first of them, so on a flip the streak is relabelled back to where it started. Without this,
+every H<->A change landed `threshold` frames late -- on the public window the predicted changes sat
+31-70 frames after the true ones (GT 12665 -> 12696, 13785 -> 13840, 14846 -> 14916), past the
+scorer's 25-frame matching tolerance, so each counted as one missed AND one spurious transition.
+With back-dating those three land at -18, +6 and +21 frames and match.
+
+Measured on the public 5-minute window, back-dated: a flat plateau at 50-65 frames (spellF1 0.520,
+macroF1 0.657, poss=13 at every point), 0.507 at 75, falling off either side. Without back-dating the
+same plateau peaked at 0.467. Below ~35 frames back-dating scores slightly lower than without it --
+short thresholds let spurious flips through, and back-dating stretches those too. A flat
+multi-point plateau rather than one lucky value is the evidence that this is a real effect of the
+mechanism, not a fit to 17 possessions (the check EVALUATION.md asks for); the gap is still inside
+this window's bootstrap band, so the private full-match score decides it.
 
 ponytail: thresholds are a flat frame count per class, same hysteresis for home and away and for
 every match situation; a felt foul (whistle before the tackle lands) needs a shorter threshold than
@@ -49,10 +56,10 @@ from baseline import HOME, AWAY, NOBODY, LABELS, build, write_submission, RESULT
 from lever1_tagging import DEAD, apply_smart_tagging  # noqa: E402
 
 # Consecutive frames of evidence for the other side needed before possession actually flips.
-# 25 fps. Brackets the plateau found by sweeping 5-200 (see module docstring) rather than a single
-# hand-picked value -- score all three, don't commit to one off 17 public possessions
+# 25 fps. Brackets the back-dated plateau found by sweeping 10-150 (see module docstring) rather
+# than a single hand-picked value -- score all three, don't commit to one off 17 public possessions
 # (EVALUATION.md's warning, same one baseline.py's docstring repeats).
-THRESHOLDS = (25, 50, 100)
+THRESHOLDS = (35, 50, 75)
 
 
 def sticky_labels(codes, threshold):
@@ -61,6 +68,7 @@ def sticky_labels(codes, threshold):
     state = None          # None = no current possessor (before first possession / after a DEAD)
     challenger = None      # the side currently building a streak against `state`
     streak = 0
+    streak_start = 0       # first frame of the current challenger streak, for back-dating
 
     for i, code in enumerate(codes):
         if code == DEAD:
@@ -77,9 +85,13 @@ def sticky_labels(codes, threshold):
             streak += 1
             if streak >= threshold:
                 state, challenger, streak = code, None, 0
+                # Back-date: the new possession began where its streak began, not where it cleared
+                # the threshold. We label the whole match at once, so rewriting what we already
+                # wrote is free -- and it removes a `threshold`-frame lag from every H<->A change.
+                out[streak_start:i] = "H" if state == HOME else "A"
         else:
-            challenger, streak = code, 1
-            if state is None and streak >= 1:
+            challenger, streak, streak_start = code, 1, i
+            if state is None:
                 # Nobody to challenge yet (match just started, or just came out of a stoppage) --
                 # the first confident read after "no possessor" wins immediately, no debounce.
                 state, challenger, streak = code, None, 0

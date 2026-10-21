@@ -28,16 +28,32 @@ def test_short_flicker_does_not_flip():
     assert set(labels) == {"H"}
 
 
-def test_sustained_evidence_flips_exactly_at_the_threshold():
+def test_sustained_evidence_flip_is_back_dated_to_the_streak_start():
     threshold = 10
     codes = np.array([HOME] * 20 + [AWAY] * 20, dtype=np.int8)
     labels = sticky_labels(codes, threshold)
-    # The flip must land inside the AWAY run, once `threshold` AWAY frames have been seen --
-    # not before (that would mean it's not debouncing) and not much later (that would mean it's
-    # not using `threshold` at all).
-    first_a = np.where(labels == "A")[0][0]
-    assert 20 <= first_a < 20 + threshold + 1, \
-        "flip at {} is not where a {}-frame threshold should land".format(first_a, threshold)
+    # The AWAY possession truly started at frame 20. Without back-dating the label would only turn
+    # at 29 (when the threshold clears) -- a lag the scorer charges on every transition.
+    assert np.all(labels[:20] == "H")
+    assert np.all(labels[20:] == "A"), \
+        "flip not back-dated: first A at {}".format(np.where(labels == "A")[0][0])
+
+
+def test_back_dating_covers_an_invisible_ball_inside_the_streak():
+    # AWAY evidence, a stretch with the ball invisible, then more AWAY until the threshold clears.
+    # The whole stretch from the first AWAY frame belongs to AWAY.
+    codes = np.array([HOME] * 20 + [AWAY] * 4 + [NOBODY] * 6 + [AWAY] * 10, dtype=np.int8)
+    labels = sticky_labels(codes, threshold=10)
+    assert np.all(labels[:20] == "H")
+    assert np.all(labels[20:] == "A")
+
+
+def test_streak_broken_by_the_holder_does_not_back_date():
+    # AWAY builds 8 frames (short of 10), HOME touches once, AWAY builds 8 again: never flips,
+    # so nothing may be rewritten either.
+    codes = np.array([HOME] * 20 + [AWAY] * 8 + [HOME] + [AWAY] * 8 + [HOME] * 5, dtype=np.int8)
+    labels = sticky_labels(codes, threshold=10)
+    assert set(labels) == {"H"}
 
 
 def test_dead_always_outputs_d_and_resets_state():
