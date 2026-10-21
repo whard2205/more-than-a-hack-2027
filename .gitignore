@@ -62,3 +62,9 @@ __pycache__/
 venv/
 env/
 .DS_Store
+
+# -- team validation labels ----------------------------------------------------------------------
+# Hand-labelled change points and the ground truth built from them are derived from the licensed
+# match video (RULES.md: do not publish derived data). Only the labelling rules are committed.
+validation/*
+!validation/README.md
