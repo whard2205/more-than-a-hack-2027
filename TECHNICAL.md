@@ -5,7 +5,7 @@ Team: Remontada Labs. Challenge: label every frame of BAR-ATH as `H`/`A`/`D`/`X`
 
 ## Approach
 
-Three stages, each a separate script in `starter/`, each independently runnable and scored:
+Four stages, each a separate script in `starter/`, each independently runnable and scored:
 
 1. **`baseline.py`** (provided) — nearest tracked player to the ball, per frame. Where the ball is
    not visible (43% of graded frames), no answer (`NOBODY`).
@@ -23,7 +23,15 @@ Three stages, each a separate script in `starter/`, each independently runnable 
    never flip it. `DEAD` frames (from step 2) reset the state to "no current possessor" — the next
    possession is only assigned once real evidence appears after the restart, never inherited from
    who had it before the stoppage. `NOBODY` frames hold the current state without reinforcing or
-   challenging it.
+   challenging it. **Back-dated:** a flip only clears after `threshold` frames, but the possession
+   it detects began at the first of them, so the streak is relabelled back to where it started
+   (we label the whole match offline, so rewriting is free). Without this every H↔A change landed
+   `threshold` frames late — 31–70 frames on the public window, past the scorer's 25-frame
+   tolerance, so each counted as one missed *and* one spurious transition.
+4. **`lever3_deadball.py`** *(candidate, not yet the submission)* — finds stoppages from the
+   tracking itself, outside the 59 tagged set pieces: the ball leaving the pitch (±2 s) and the
+   players running well below their own local pace (mean speed under 0.70 × its rolling median
+   over ±7.5 min, for at least 4 s). Writes the same `DEAD` sentinel lever 1 does.
 
 ## Definition of possession / control
 
@@ -60,9 +68,9 @@ risked adding noise rather than removing it, for no measured gain we could point
 differences there are noise. We treated the public window as a **sanity check and a coarse
 direction-finder**, never as a tuning set to chase a specific number:
 
-- Lever 2's threshold was swept from 5 to 200 frames. Score rises smoothly to a **flat plateau at
-  50–65 frames** (poss=13, duration 22.2 s, fragmentation 0.71, spellF1 0.45–0.47 identically at
-  every point in that range), then falls off past 75. A multi-point plateau, not one lucky value,
+- Lever 2's threshold was swept from 10 to 150 frames (re-swept after back-dating). Score rises
+  smoothly to a **flat plateau at 50–65 frames** (poss=13, duration 22.2 s, spellF1 0.520 at every
+  point in that range, 0.507 at 75), then falls off. A multi-point plateau, not one lucky value,
   is why we trust this as a real effect of the mechanism rather than a fit to 17 possessions.
   Shipped threshold: **50 frames (2.0 s)**, the start of the plateau.
 - We did not search sub-frame thresholds, per-class thresholds (home vs. away), or per-restart-type
@@ -77,7 +85,8 @@ direction-finder**, never as a tuning set to chase a specific number:
 | baseline_raw (provided) | 0.597 | 0.038 | 131 | 2.0 s |
 | baseline_smooth125 (provided, best of 4) | 0.581 | 0.424 | 16 | 18.5 s |
 | lever1 (tagging_smooth125) | 0.651 | 0.449 | 16 | 18.0 s |
-| **lever1 + lever2 (sticky_h50)** | **0.652** | **0.467** | **13** | **22.2 s** |
+| **lever1 + lever2 back-dated (sticky_h50)** | **0.657** | **0.520** | **13** | **22.2 s** |
+| lever1 + lever2 + lever3 (dead_h50) — *candidate* | 0.824 | 0.516 | 14 | 17.7 s |
 
 The headline gain (spellF1 0.467 vs. 0.424) is below this window's own bootstrap noise band — 17
 possessions cannot confirm it, which is exactly what `EVALUATION.md` warns about. What we trust
@@ -85,6 +94,17 @@ more: **macroF1 and the per-class D-score rise consistently across every smoothe
 tried and never regress relative to their baseline counterpart** (`macroF1` is computed over 7,500
 graded frames on this window, not 17 possessions, so it is far less sensitive to this sample being
 small). Final ranking is decided by the private full-match score, per the rules.
+
+**Lever 3 is not adopted yet, and why.** On this window it lifts the D-class F1 from 0.33 to 0.76 and
+macroF1 from 0.657 to 0.824 while leaving spellF1 flat (0.520 → 0.516, inside the noise). But its
+parameters were chosen from the window's four true stoppages, so that gain is not evidence. A first
+version with a *fixed* 1.5 m/s speed cut-off produced an even better-looking window score
+(macroF1 0.84) while flagging 55% of the whole match as dead: players' median speed falls from ~2.0
+m/s in the opening minutes to 1.0–1.7 m/s later, and the public window is the fastest stretch. We
+caught it only by checking the flagged share in every 5-minute block, and replaced it with the
+relative threshold above (flagged share 14–58% per block instead of 20–79%; regression test
+`test_gradual_slowdown_is_not_a_stoppage`). It is adopted only if it also improves on the team
+validation set (`starter/make_validation_gt.py`, hand labels used for validation only, kept local).
 
 ## Limitations
 
@@ -115,7 +135,8 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 # unpack the competition data into ./data (see DATA.md) or export MTAH_DATA_DIR
 .venv/bin/python starter/baseline.py           # writes the 4 provided baselines
 .venv/bin/python starter/lever1_tagging.py     # writes tagging_{raw,smooth25,smooth50,smooth125}
-.venv/bin/python starter/lever2_sticky.py      # writes sticky_{h25,h50,h100} -- h50 is the submission
+.venv/bin/python starter/lever2_sticky.py      # writes sticky_{h35,h50,h75} -- h50 is the submission
+.venv/bin/python starter/lever3_deadball.py    # writes dead_{h35,h50,h75} -- candidate, see Results
 .venv/bin/python evaluation/run_evaluation.py --bootstrap 1000
 .venv/bin/python evaluation/validate_submission.py evaluation/results/sticky_h50.csv
 ```
@@ -124,6 +145,8 @@ Self-checks (no data download required, synthetic + smoke tests):
 
 ```bash
 .venv/bin/python starter/test_lever2_sticky.py    # synthetic, runs anywhere
+.venv/bin/python starter/test_lever3_deadball.py  # synthetic, runs anywhere
+.venv/bin/python starter/test_make_validation_gt.py  # needs only the public ground truth
 .venv/bin/python starter/test_lever1_tagging.py   # needs the real data on disk
 ```
 

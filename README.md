@@ -12,8 +12,8 @@ question to answer with it.
 
 > **This fork — Team Remontada Labs' submission.** Our pipeline lives in `starter/lever1_tagging.py`
 > (Smart Tagging confirms real stoppages) and `starter/lever2_sticky.py` (a causal hysteresis state
-> machine instead of symmetric smoothing). Current best candidate: `sticky_h50`, spellF1 0.467 /
-> macroF1 0.652 on the public window, vs. 0.424 / 0.581 for the best provided baseline. Full
+> machine instead of symmetric smoothing). Current best candidate: `sticky_h50`, spellF1 0.520 /
+> macroF1 0.657 on the public window, vs. 0.424 / 0.581 for the best provided baseline. Full
 > write-up, asset choices and limitations in **[TECHNICAL.md](TECHNICAL.md)**. Verified reproducible
 > from a clean clone (`git clone` → `pip install -r requirements.txt` → point `MTAH_DATA_DIR` at the
 > unpacked data → the four commands in TECHNICAL.md's Reproduction section).
@@ -145,7 +145,9 @@ evaluation/
 starter/
   baseline.py               the reference baseline, numpy only
   lever1_tagging.py         [this fork] Smart Tagging confirms real stoppages -> DEAD
-  lever2_sticky.py          [this fork] hysteresis state machine, replaces symmetric smoothing
+  lever2_sticky.py          [this fork] back-dated hysteresis state machine, replaces symmetric smoothing
+  lever3_deadball.py        [this fork] dead-ball detector from ball-out + relative player speed (candidate)
+  make_validation_gt.py     [this fork] hand-labelled change points -> a GT the scorer reads (--gt)
   test_lever1_tagging.py    [this fork] self-check for lever1
   test_lever2_sticky.py     [this fork] self-check for lever2, synthetic, no data needed
   load_atd.py               read the tracking and line it up with video frames
