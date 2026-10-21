@@ -10,6 +10,16 @@ question to answer with it.
 
 ---
 
+> **This fork — Team Remontada Labs' submission.** Our pipeline lives in `starter/lever1_tagging.py`
+> (Smart Tagging confirms real stoppages) and `starter/lever2_sticky.py` (a causal hysteresis state
+> machine instead of symmetric smoothing). Current best candidate: `sticky_h50`, spellF1 0.467 /
+> macroF1 0.652 on the public window, vs. 0.424 / 0.581 for the best provided baseline. Full
+> write-up, asset choices and limitations in **[TECHNICAL.md](TECHNICAL.md)**. Verified reproducible
+> from a clean clone (`git clone` → `pip install -r requirements.txt` → point `MTAH_DATA_DIR` at the
+> unpacked data → the four commands in TECHNICAL.md's Reproduction section).
+
+---
+
 ## The task
 
 **For every frame of the match, say who has the ball.**
@@ -134,6 +144,10 @@ evaluation/
   results/                  the four baselines; put your submissions here
 starter/
   baseline.py               the reference baseline, numpy only
+  lever1_tagging.py         [this fork] Smart Tagging confirms real stoppages -> DEAD
+  lever2_sticky.py          [this fork] hysteresis state machine, replaces symmetric smoothing
+  test_lever1_tagging.py    [this fork] self-check for lever1
+  test_lever2_sticky.py     [this fork] self-check for lever2, synthetic, no data needed
   load_atd.py               read the tracking and line it up with video frames
   load_smart_tagging.py     read the tactical tagging as video-frame intervals
   load_homography.py        read the homography; project pitch <-> pixels
